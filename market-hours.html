@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Hours – Pacific Time</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f3;
+    --bg3: #ebebea;
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --border: rgba(0,0,0,0.12);
+    --border2: rgba(0,0,0,0.22);
+    --green-bg: #E1F5EE;
+    --green-text: #0F6E56;
+    --green-accent: #1D9E75;
+    --red-bg: #FCEBEB;
+    --red-text: #A32D2D;
+    --red-accent: #E24B4A;
+    --amber-bg: #FAEEDA;
+    --amber-text: #854F0B;
+    --amber-accent: #BA7517;
+    --radius: 12px;
+    --radius-sm: 8px;
+    /* Clock colors - always gray */
+    --clock-face: #f8f8f6;
+    --clock-rim: #c8c8c4;
+    --clock-hand: #444441;
+    --clock-second: #888780;
+    --clock-text: #6b6b67;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --bg2: #262624; --bg3: #2e2e2b;
+      --text: #f0efe8; --text2: #8a8a84;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+      --green-bg: #085041; --green-text: #9FE1CB;
+      --red-bg: #501313; --red-text: #F7C1C1;
+      --amber-bg: #633806; --amber-text: #FAC775;
+      --clock-face: #2e2e2b;
+      --clock-rim: #4a4a46;
+      --clock-hand: #d3d1c7;
+      --clock-second: #888780;
+      --clock-text: #8a8a84;
+    }
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg2); color: var(--text); min-height: 100vh; }
+
+  header {
+    background: var(--bg); border-bottom: 0.5px solid var(--border);
+    padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 10; gap: 12px; flex-wrap: wrap;
+  }
+  .header-left h1 { font-size: 16px; font-weight: 500; }
+  .header-left p { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .header-left p span { color: var(--text); font-weight: 500; }
+  .edit-btn {
+    font-size: 12px; padding: 6px 14px; border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border2); background: transparent; color: var(--text2); cursor: pointer;
+  }
+  .edit-btn:hover { background: var(--bg3); }
+
+  main { padding: 16px 16px 40px; max-width: 1000px; margin: 0 auto; }
+
+  .banner {
+    background: var(--amber-bg); border: 0.5px solid var(--amber-accent);
+    border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 14px;
+    font-size: 13px; color: var(--amber-text); display: none;
+  }
+  .banner.show { display: block; }
+  .banner b { font-weight: 500; }
+
+  .panel {
+    background: var(--bg); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px 18px; margin-bottom: 16px;
+    overflow-x: auto;
+  }
+  .panel-title {
+    font-size: 10px; font-weight: 500; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 12px;
+  }
+
+  .tl-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 520px; }
+  .tl-header-cell { width: 180px; }
+  .tl-hours-cell { position: relative; height: 18px; }
+  .tl-hour-label {
+    position: absolute; font-size: 10px; color: var(--text2);
+    transform: translateX(-50%); top: 0; white-space: nowrap;
+  }
+
+  .tl-left { width: 180px; padding-right: 12px; vertical-align: middle; }
+  .tl-row-inner { display: flex; align-items: center; gap: 8px; }
+  .tl-label {
+    flex: 1; font-size: 11px; font-weight: 500;
+    padding: 3px 8px; border-radius: var(--radius-sm);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: background 0.3s, color 0.3s;
+  }
+  .tl-label.open    { background: var(--green-bg); color: var(--green-text); }
+  .tl-label.closed  { background: var(--red-bg);   color: var(--red-text); }
+  .tl-label.holiday { background: var(--amber-bg); color: var(--amber-text); }
+
+  .tl-right { vertical-align: middle; padding: 3px 0; }
+  .tl-track {
+    height: 22px; background: var(--bg3); border-radius: 5px;
+    position: relative; overflow: hidden;
+  }
+  .tl-bar { position: absolute; height: 100%; border-radius: 4px; }
+  .tl-bar.open-bar    { background: var(--green-accent); opacity: 0.8; }
+  .tl-bar.holiday-bar { background: var(--amber-accent); opacity: 0.45; }
+  .tl-now {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: rgba(255,255,255,0.7);
+    z-index: 2;
+    box-shadow: 0 0 3px rgba(0,0,0,0.25);
+  }
+
+  /* Cards */
+  .section-head {
+    font-size: 10px; font-weight: 500; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.07em; margin: 18px 0 8px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+  .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 14px 16px; border-left-width: 3px; }
+  .card.open    { border-left-color: var(--green-accent); }
+  .card.closed  { border-left-color: var(--red-accent); }
+  .card.holiday { border-left-color: var(--amber-accent); }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .ex-name { font-size: 13px; font-weight: 500; }
+  .ex-short { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .badge { font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+  .badge.open    { background: var(--green-bg); color: var(--green-text); }
+  .badge.closed  { background: var(--red-bg);   color: var(--red-text); }
+  .badge.holiday { background: var(--amber-bg); color: var(--amber-text); }
+  .times { display: flex; gap: 18px; }
+  .time-block .lbl { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; }
+  .time-block .val { font-size: 13px; font-variant-numeric: tabular-nums; }
+  .countdown-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-top: 8px; padding-top: 8px; border-top: 0.5px solid var(--border);
+  }
+  .cd-label { font-size: 11px; color: var(--text2); }
+  .cd-timer { font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; }
+  .cd-timer.close-cd { color: var(--green-text); }
+  .cd-timer.next-cd  { color: var(--text2); }
+  .note { font-size: 12px; margin-top: 6px; }
+  .note.holiday { color: var(--amber-text); }
+  .note.info    { color: var(--text2); }
+
+  /* Modal */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--bg); border-radius: var(--radius); border: 0.5px solid var(--border); padding: 20px; width: min(460px, 100%); max-height: 82vh; overflow-y: auto; }
+  .modal h2 { font-size: 15px; font-weight: 500; margin-bottom: 14px; }
+  .ex-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--border); }
+  .ex-row:last-child { border-bottom: none; }
+  .ex-row label { flex: 1; font-size: 13px; cursor: pointer; }
+  .ex-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--green-accent); cursor: pointer; }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .btn-primary { font-size: 13px; padding: 7px 18px; border-radius: var(--radius-sm); border: none; background: var(--green-accent); color: #fff; cursor: pointer; }
+  .btn-cancel { font-size: 13px; padding: 7px 18px; border-radius: var(--radius-sm); border: 0.5px solid var(--border2); background: transparent; color: var(--text2); cursor: pointer; }
+  .btn-cancel:hover { background: var(--bg3); }
+  .empty { padding: 32px 0; text-align: center; color: var(--text2); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Market Hours</h1>
+    <p id="ptNow">loading…</p>
+  </div>
+  <button class="edit-btn" onclick="openModal()">Customize exchanges</button>
+</header>
+
+<main>
+  <div class="banner" id="banner"></div>
+
+  <div class="panel">
+    <div class="panel-title">24-hour view — Pacific time</div>
+    <div id="tlWrap"></div>
+  </div>
+
+  <div id="cards"></div>
+</main>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2>Choose exchanges to display</h2>
+    <div id="modalList"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const EXCHANGES = [
+  { id:'NYSE', name:'New York Stock Exchange', short:'NYSE/NASDAQ', tz:'America/New_York', open:[9,30], close:[16,0],
+    holidays:['2025-01-01','2025-01-20','2025-02-17','2025-04-18','2025-05-26','2025-06-19','2025-07-04','2025-09-01','2025-11-27','2025-12-25','2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25','2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25'],
+    earlyClose:{'2025-07-03':[13,0],'2025-11-28':[13,0],'2025-12-24':[13,0],'2026-07-02':[13,0],'2026-11-27':[13,0],'2026-12-24':[13,0]} },
+  { id:'LSE', name:'London Stock Exchange', short:'LSE', tz:'Europe/London', open:[8,0], close:[16,30],
+    holidays:['2025-01-01','2025-04-18','2025-04-21','2025-05-05','2025-05-26','2025-08-25','2025-12-25','2025-12-26','2026-01-01','2026-04-03','2026-04-06','2026-05-04','2026-05-25','2026-08-31','2026-12-25','2026-12-28'], earlyClose:{} },
+  { id:'TSE', name:'Tokyo Stock Exchange', short:'TSE', tz:'Asia/Tokyo', open:[9,0], close:[15,30],
+    holidays:['2025-01-01','2025-01-02','2025-01-03','2025-01-13','2025-02-11','2025-02-24','2025-03-20','2025-04-29','2025-05-03','2025-05-04','2025-05-05','2025-07-21','2025-08-11','2025-09-15','2025-09-23','2025-10-13','2025-11-03','2025-11-24','2025-12-31','2026-01-01','2026-01-02','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23','2026-10-12','2026-11-03','2026-11-23','2026-12-31'],
+    lunch:[[11,30],[12,30]], earlyClose:{} },
+  { id:'HKEX', name:'Hong Kong Exchange', short:'HKEX', tz:'Asia/Hong_Kong', open:[9,30], close:[16,0],
+    holidays:['2025-01-01','2025-01-29','2025-01-30','2025-01-31','2025-04-04','2025-04-18','2025-04-19','2025-04-21','2025-05-01','2025-05-05','2025-05-31','2025-07-01','2025-10-01','2025-10-07','2025-12-25','2025-12-26','2026-01-01','2026-01-26','2026-01-27','2026-01-28','2026-04-03','2026-04-06','2026-04-07','2026-05-01','2026-05-25','2026-07-01','2026-10-01','2026-10-26','2026-12-25','2026-12-28'],
+    lunch:[[12,0],[13,0]], earlyClose:{} },
+  { id:'SSE', name:'Shanghai / Shenzhen', short:'SSE/SZSE', tz:'Asia/Shanghai', open:[9,30], close:[15,0],
+    holidays:['2025-01-01','2025-01-28','2025-01-29','2025-01-30','2025-01-31','2025-02-03','2025-02-04','2025-04-04','2025-05-01','2025-05-02','2025-05-05','2025-06-02','2025-10-01','2025-10-02','2025-10-03','2025-10-06','2025-10-07','2025-10-08','2026-01-01','2026-01-26','2026-01-27','2026-01-28','2026-01-29','2026-01-30','2026-02-02','2026-04-06','2026-05-01','2026-06-19','2026-09-25','2026-10-01','2026-10-02','2026-10-05','2026-10-06','2026-10-07','2026-10-08'],
+    lunch:[[11,30],[13,0]], earlyClose:{} },
+  { id:'XETRA', name:'Xetra (Frankfurt)', short:'XETRA', tz:'Europe/Berlin', open:[9,0], close:[17,30],
+    holidays:['2025-01-01','2025-04-18','2025-04-21','2025-05-01','2025-12-24','2025-12-25','2025-12-26','2025-12-31','2026-01-01','2026-04-03','2026-04-06','2026-05-01','2026-12-24','2026-12-25','2026-12-28','2026-12-31'], earlyClose:{} },
+  { id:'TSX', name:'Toronto Stock Exchange', short:'TSX', tz:'America/Toronto', open:[9,30], close:[16,0],
+    holidays:['2025-01-01','2025-02-17','2025-04-18','2025-05-19','2025-07-01','2025-09-01','2025-10-13','2025-11-11','2025-12-25','2025-12-26','2026-01-01','2026-02-16','2026-04-03','2026-05-18','2026-07-01','2026-09-07','2026-10-12','2026-11-11','2026-12-25','2026-12-28'], earlyClose:{} },
+  { id:'ASX', name:'Australian Securities Exchange', short:'ASX', tz:'Australia/Sydney', open:[10,0], close:[16,0],
+    holidays:['2025-01-01','2025-01-27','2025-04-18','2025-04-21','2025-04-25','2025-06-09','2025-12-25','2025-12-26','2026-01-01','2026-01-26','2026-04-03','2026-04-06','2026-04-27','2026-06-08','2026-12-25','2026-12-28'], earlyClose:{} },
+  { id:'NSE', name:'NSE India', short:'NSE', tz:'Asia/Kolkata', open:[9,15], close:[15,30],
+    holidays:['2025-02-26','2025-03-14','2025-03-31','2025-04-10','2025-04-14','2025-04-18','2025-05-01','2025-08-15','2025-10-02','2025-10-20','2025-10-21','2025-11-05','2025-12-25','2026-01-26','2026-03-19','2026-04-03','2026-04-14','2026-05-01','2026-08-15','2026-10-02','2026-10-28','2026-11-14','2026-12-25'], earlyClose:{} },
+  { id:'EURONEXT', name:'Euronext Paris', short:'Euronext', tz:'Europe/Paris', open:[9,0], close:[17,30],
+    holidays:['2025-01-01','2025-04-18','2025-04-21','2025-05-01','2025-12-25','2025-12-26','2026-01-01','2026-04-03','2026-04-06','2026-05-01','2026-12-25','2026-12-28'], earlyClose:{} }
+];
+
+const DEFAULT = ['NYSE','LSE','TSE','HKEX','XETRA','ASX'];
+function load() { try { return JSON.parse(localStorage.getItem('mh_sel')) || DEFAULT; } catch(e) { return DEFAULT; } }
+function saveSel(s) { try { localStorage.setItem('mh_sel', JSON.stringify(s)); } catch(e) {} }
+let selected = load();
+
+function exNow(tz) { return new Date(new Date().toLocaleString('en-US', {timeZone:tz})); }
+function dateStr(d) { return d.toLocaleDateString('sv-SE'); }
+function isHol(ex, ds) { return ex.holidays.includes(ds); }
+
+function getStatus(ex) {
+  const now=exNow(ex.tz), dow=now.getDay(), ds=dateStr(now);
+  if (dow===0||dow===6) return {s:'closed', note:'Weekend'};
+  if (isHol(ex,ds)) return {s:'holiday', note:'Market holiday'};
+  const h=now.getHours(), m=now.getMinutes(), mins=h*60+m;
+  const openM=ex.open[0]*60+ex.open[1];
+  const closeArr=(ex.earlyClose&&ex.earlyClose[ds])?ex.earlyClose[ds]:ex.close;
+  const closeM=closeArr[0]*60+closeArr[1];
+  if (ex.lunch) {
+    const lb0=ex.lunch[0][0]*60+ex.lunch[0][1], lb1=ex.lunch[1][0]*60+ex.lunch[1][1];
+    if (mins>=lb0&&mins<lb1) return {s:'closed', note:'Lunch break'};
+  }
+  if (mins>=openM&&mins<closeM) return {s:'open', note:(ex.earlyClose&&ex.earlyClose[ds])?'Early close today':null};
+  return {s:'closed', note:mins<openM?'before-open':'after-close'};
+}
+
+function wallMs(exT, arr, diff) {
+  const d=new Date(exT); d.setHours(arr[0],arr[1],0,0); return d.getTime()+diff;
+}
+
+function ptTimes(ex) {
+  const now=Date.now(), exT=exNow(ex.tz), diff=now-exT.getTime();
+  const ds=dateStr(exT);
+  const closeArr=(ex.earlyClose&&ex.earlyClose[ds])?ex.earlyClose[ds]:ex.close;
+  const openMs=wallMs(exT,ex.open,diff), closeMs=wallMs(exT,closeArr,diff);
+  const fmt=ms=>new Date(ms).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/Los_Angeles'});
+  return {openStr:fmt(openMs), closeStr:fmt(closeMs), openMs, closeMs};
+}
+
+function nextOpenMs(ex) {
+  const now=Date.now(), exT=exNow(ex.tz), diff=now-exT.getTime();
+  for (let d=0;d<=12;d++) {
+    const c=new Date(exT); c.setDate(c.getDate()+d); c.setHours(ex.open[0],ex.open[1],0,0);
+    if (c.getDay()===0||c.getDay()===6||isHol(ex,dateStr(c))) continue;
+    const ms=c.getTime()+diff; if (ms>now) return ms;
+  }
+  return null;
+}
+
+function fmtTimer(ms) {
+  if (!ms||ms<=0) return '--:--:--';
+  const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+// Clock always gray — no status color
+function makeClockSVG(tz) {
+  const now=exNow(tz);
+  const h=now.getHours(), m=now.getMinutes(), s=now.getSeconds();
+  const ampm=h>=12?'PM':'AM';
+  const secDeg=s*6, minDeg=m*6+s*0.1, hourDeg=(h%12)*30+m*0.5;
+  const cx=22, cy=22, R=19;
+  function handEnd(deg,len) {
+    const rad=(deg-90)*Math.PI/180;
+    return {x:(cx+Math.cos(rad)*len).toFixed(1), y:(cy+Math.sin(rad)*len).toFixed(1)};
+  }
+  const hE=handEnd(hourDeg,11), mE=handEnd(minDeg,15), sE=handEnd(secDeg,17);
+  let ticks='';
+  for (let i=0;i<12;i++) {
+    const ang=(i*30-90)*Math.PI/180, major=i%3===0;
+    const r1=major?R-3:R-2;
+    ticks+=`<line x1="${(cx+Math.cos(ang)*r1).toFixed(1)}" y1="${(cy+Math.sin(ang)*r1).toFixed(1)}" x2="${(cx+Math.cos(ang)*R).toFixed(1)}" y2="${(cy+Math.sin(ang)*R).toFixed(1)}" stroke="var(--clock-hand)" stroke-width="${major?1.2:0.6}" stroke-linecap="round" opacity="0.4"/>`;
+  }
+  return `<svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="${cx}" cy="${cy}" r="${R+1}" fill="var(--clock-face)" stroke="var(--clock-rim)" stroke-width="1.2"/>
+    ${ticks}
+    <line x1="${cx}" y1="${cy}" x2="${hE.x}" y2="${hE.y}" stroke="var(--clock-hand)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="${cx}" y1="${cy}" x2="${mE.x}" y2="${mE.y}" stroke="var(--clock-hand)" stroke-width="1.4" stroke-linecap="round"/>
+    <line x1="${cx}" y1="${cy}" x2="${sE.x}" y2="${sE.y}" stroke="var(--clock-second)" stroke-width="0.8" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="1.5" fill="var(--clock-second)"/>
+    <text x="${cx}" y="${cy+8}" text-anchor="middle" font-size="5.5" font-family="-apple-system,sans-serif" font-weight="600" fill="var(--clock-text)">${ampm}</text>
+  </svg>`;
+}
+
+function renderTimeline() {
+  const ptMid=exNow('America/Los_Angeles'); ptMid.setHours(0,0,0,0);
+  const dayStart=ptMid.getTime(), dayMs=86400000;
+  const nowPct=Math.min(100,Math.max(0,(Date.now()-dayStart)/dayMs*100));
+
+  const hours=[0,3,6,9,12,15,18,21,24];
+  const hourLabels=hours.map(h=>{
+    const label=h===0||h===24?'12a':h===12?'12p':h<12?h+'a':(h-12)+'p';
+    return `<div class="tl-hour-label" style="left:${(h/24*100).toFixed(2)}%">${label}</div>`;
+  }).join('');
+
+  const rows=EXCHANGES.filter(e=>selected.includes(e.id)).map(ex=>{
+    const exT=exNow(ex.tz), diff=Date.now()-exT.getTime();
+    const ds=dateStr(exT), dow=exT.getDay();
+    const todayHol=(dow!==0&&dow!==6)&&isHol(ex,ds);
+    const st=getStatus(ex);
+
+    let bars='';
+    if (!todayHol&&dow!==0&&dow!==6) {
+      [-1,0,1].forEach(offset=>{
+        const base=new Date(exT); base.setDate(base.getDate()+offset);
+        const bds=dateStr(base), bdow=base.getDay();
+        if (bdow===0||bdow===6||isHol(ex,bds)) return;
+        const closeArr=(ex.earlyClose&&ex.earlyClose[bds])?ex.earlyClose[bds]:ex.close;
+        const oMs=wallMs(base,ex.open,diff), cMs=wallMs(base,closeArr,diff);
+        const s2=Math.max(oMs,dayStart), e2=Math.min(cMs,dayStart+dayMs);
+        if (e2>s2) {
+          const left=((s2-dayStart)/dayMs*100).toFixed(2);
+          const width=((e2-s2)/dayMs*100).toFixed(2);
+          bars+=`<div class="tl-bar open-bar" style="left:${left}%;width:${width}%"></div>`;
+        }
+      });
+    } else if (todayHol) {
+      bars=`<div class="tl-bar holiday-bar" style="left:0%;width:100%"></div>`;
+    }
+
+    return `<tr>
+      <td class="tl-left">
+        <div class="tl-row-inner">
+          <div id="clock_${ex.id}" style="flex-shrink:0">${makeClockSVG(ex.tz)}</div>
+          <div class="tl-label ${st.s}" title="${ex.name}">${ex.short}</div>
+        </div>
+      </td>
+      <td class="tl-right">
+        <div class="tl-track">
+          ${bars}
+          <div class="tl-now" style="left:${nowPct.toFixed(2)}%"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tlWrap').innerHTML=`
+    <table class="tl-table">
+      <tr>
+        <td class="tl-header-cell"></td>
+        <td class="tl-right"><div class="tl-hours-cell">${hourLabels}</div></td>
+      </tr>
+      ${rows}
+    </table>`;
+}
+
+function renderBanner() {
+  const hols=EXCHANGES.filter(e=>selected.includes(e.id)).filter(ex=>{
+    const now=exNow(ex.tz),dow=now.getDay(),ds=dateStr(now);
+    return dow!==0&&dow!==6&&isHol(ex,ds);
+  }).map(e=>e.short);
+  const b=document.getElementById('banner');
+  if (hols.length){b.innerHTML=`<b>Holiday today:</b> ${hols.join(', ')} ${hols.length===1?'is':'are'} closed.`;b.classList.add('show');}
+  else b.classList.remove('show');
+}
+
+function renderCards() {
+  const open=[],holiday=[],closed=[];
+  EXCHANGES.filter(e=>selected.includes(e.id)).forEach(ex=>{
+    const st=getStatus(ex),pt=ptTimes(ex),now=Date.now();
+    let cdLabel,cdValue,cdClass;
+    if(st.s==='open'){cdLabel='Closes in';cdValue=fmtTimer(pt.closeMs-now);cdClass='close-cd';}
+    else{cdLabel='Next open in';cdValue=fmtTimer(nextOpenMs(ex)-now);cdClass='next-cd';}
+    const obj={ex,st,pt,cdLabel,cdValue,cdClass};
+    if(st.s==='open')open.push(obj);
+    else if(st.s==='holiday')holiday.push(obj);
+    else closed.push(obj);
+  });
+  const card=({ex,st,pt,cdLabel,cdValue,cdClass})=>`
+    <div class="card ${st.s}">
+      <div class="card-top">
+        <div><div class="ex-name">${ex.name}</div><div class="ex-short">${ex.short}</div></div>
+        <span class="badge ${st.s}">${st.s==='open'?'Open':st.s==='holiday'?'Holiday':'Closed'}</span>
+      </div>
+      <div class="times">
+        <div class="time-block"><div class="lbl">Opens PT</div><div class="val">${pt.openStr}</div></div>
+        <div class="time-block"><div class="lbl">Closes PT</div><div class="val">${pt.closeStr}</div></div>
+      </div>
+      <div class="countdown-row">
+        <span class="cd-label">${cdLabel}</span>
+        <span class="cd-timer ${cdClass}" id="cd_${ex.id}">${cdValue}</span>
+      </div>
+      ${st.s==='holiday'?`<div class="note holiday">Market holiday</div>`:''}
+      ${st.s==='closed'&&st.note&&!['before-open','after-close','Weekend'].includes(st.note)?`<div class="note info">${st.note}</div>`:''}
+      ${st.s==='open'&&st.note?`<div class="note info">${st.note}</div>`:''}
+    </div>`;
+  let html='';
+  if(open.length)    html+=`<div class="section-head">Open now</div><div class="grid">${open.map(card).join('')}</div>`;
+  if(holiday.length) html+=`<div class="section-head">Holiday</div><div class="grid">${holiday.map(card).join('')}</div>`;
+  if(closed.length)  html+=`<div class="section-head">Closed</div><div class="grid">${closed.map(card).join('')}</div>`;
+  if(!html) html=`<div class="empty">No exchanges selected.</div>`;
+  document.getElementById('cards').innerHTML=html;
+}
+
+let lastMinute=-1;
+
+function tick() {
+  const pt=exNow('America/Los_Angeles');
+  const localStr=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+  document.getElementById('ptNow').innerHTML=
+    `Pacific: <span>${pt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true})}</span> · ${pt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})} &nbsp;·&nbsp; Local: <span>${localStr}</span>`;
+
+  EXCHANGES.filter(e=>selected.includes(e.id)).forEach(ex=>{
+    const el=document.getElementById('clock_'+ex.id);
+    if(el) el.innerHTML=makeClockSVG(ex.tz);
+  });
+
+  const now=Date.now();
+  EXCHANGES.filter(e=>selected.includes(e.id)).forEach(ex=>{
+    const el=document.getElementById('cd_'+ex.id);
+    if(!el) return;
+    const st=getStatus(ex),pt2=ptTimes(ex);
+    el.textContent=st.s==='open'?fmtTimer(pt2.closeMs-now):fmtTimer(nextOpenMs(ex)-now);
+  });
+
+  const min=pt.getMinutes();
+  if(min!==lastMinute){
+    lastMinute=min;
+    renderBanner(); renderTimeline(); renderCards();
+  }
+}
+
+function fullRender(){renderBanner();renderTimeline();renderCards();}
+
+function openModal(){
+  document.getElementById('modalList').innerHTML=EXCHANGES.map(ex=>`
+    <div class="ex-row">
+      <input type="checkbox" id="c_${ex.id}" ${selected.includes(ex.id)?'checked':''}>
+      <label for="c_${ex.id}">${ex.name} <span style="color:var(--text2);font-size:11px">(${ex.short})</span></label>
+    </div>`).join('');
+  document.getElementById('modalBg').classList.add('open');
+}
+function closeModal(){document.getElementById('modalBg').classList.remove('open');}
+function saveModal(){
+  selected=EXCHANGES.filter(e=>document.getElementById('c_'+e.id)?.checked).map(e=>e.id);
+  saveSel(selected);closeModal();fullRender();
+}
+document.getElementById('modalBg').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+fullRender(); tick();
+setInterval(tick,1000);
+</script>
+</body>
+</html>
