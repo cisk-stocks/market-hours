@@ -269,6 +269,16 @@ function ptTimes(ex) {
 
 function nextOpenMs(ex) {
   const now=Date.now(), exT=exNow(ex.tz), diff=now-exT.getTime();
+  // If currently in lunch break, return time until afternoon session resumes
+  if (ex.lunch) {
+    const h=exT.getHours(), m=exT.getMinutes(), mins=h*60+m;
+    const lb0=ex.lunch[0][0]*60+ex.lunch[0][1];
+    const lb1=ex.lunch[1][0]*60+ex.lunch[1][1];
+    if (mins>=lb0&&mins<lb1) {
+      const resume=new Date(exT); resume.setHours(ex.lunch[1][0],ex.lunch[1][1],0,0);
+      return resume.getTime()+diff;
+    }
+  }
   for (let d=0;d<=12;d++) {
     const c=new Date(exT); c.setDate(c.getDate()+d); c.setHours(ex.open[0],ex.open[1],0,0);
     if (c.getDay()===0||c.getDay()===6||isHol(ex,dateStr(c))) continue;
@@ -390,6 +400,7 @@ function renderCards() {
     const st=getStatus(ex),pt=ptTimes(ex),now=Date.now();
     let cdLabel,cdValue,cdClass;
     if(st.s==='open'){cdLabel='Closes in';cdValue=fmtTimer(pt.closeMs-now);cdClass='close-cd';}
+    else if(st.note==='Lunch break'){cdLabel='Reopens in';cdValue=fmtTimer(nextOpenMs(ex)-now);cdClass='next-cd';}
     else{cdLabel='Next open in';cdValue=fmtTimer(nextOpenMs(ex)-now);cdClass='next-cd';}
     const obj={ex,st,pt,cdLabel,cdValue,cdClass};
     if(st.s==='open')open.push(obj);
@@ -407,7 +418,7 @@ function renderCards() {
         <div class="time-block"><div class="lbl">Closes PT</div><div class="val">${pt.closeStr}</div></div>
       </div>
       <div class="countdown-row">
-        <span class="cd-label">${cdLabel}</span>
+        <span class="cd-label" id="cd_lbl_${ex.id}">${cdLabel}</span>
         <span class="cd-timer ${cdClass}" id="cd_${ex.id}">${cdValue}</span>
       </div>
       ${st.s==='holiday'?`<div class="note holiday">Market holiday</div>`:''}
@@ -441,6 +452,9 @@ function tick() {
     if(!el) return;
     const st=getStatus(ex),pt2=ptTimes(ex);
     el.textContent=st.s==='open'?fmtTimer(pt2.closeMs-now):fmtTimer(nextOpenMs(ex)-now);
+    // Update label too if in lunch break
+    const lbl=document.getElementById('cd_lbl_'+ex.id);
+    if(lbl) lbl.textContent=st.note==='Lunch break'?'Reopens in':'Next open in';
   });
 
   const min=pt.getMinutes();
